@@ -102,8 +102,8 @@ unit GpTimezone;
 interface
 
 uses
-  Windows,
-  Classes;
+  Winapi.Windows,
+  System.Classes;
 
 const
   MINUTESPERDAY = 1440;
@@ -316,15 +316,20 @@ type
   {: Returns base key (relative to HKEY_LOCAL_MACHINE) for timezone settings. }
   function TimeZoneRegKey: string;
 
+  {: Returns the Local TimeZone Bias, in Minutes, taking into account Standard
+	and/or Daylight Biases, from the Regional Settings.
+	@cat SystemOps}
+  function GetLocalTZBias: LongInt;
+
 var
   G_RegistryTZ: TGpRegistryTimeZones; // used in GetTZCount, GetTZ
 
 implementation
 
 uses
-  SysUtils,
-  Registry,
-  ESBDates;
+  System.SysUtils,
+  System.Win.Registry,
+  System.DateUtils;
 
 {$UNDEF NeedBetterRegistry}       //There is no OpenKeyReadonly in Delphi 2 and 3.
 {$UNDEF NoResourcestring}         //There is no resourcestring in Delphi 2.
@@ -497,7 +502,7 @@ end;
     var DaylightDate, StandardDate: TDateTime;
     var DaylightBias, StandardBias: integer): boolean;
   begin
-    Result := GetTZDaylightSavingInfoForYear(TZ,ThisYear,DaylightDate,StandardDate,DaylightBias,StandardBias);
+    Result := GetTZDaylightSavingInfoForYear(TZ,CurrentYear,DaylightDate,StandardDate,DaylightBias,StandardBias);
   end; { GetTZDaylightSavingInfo }
 
   function GetDaylightSavingInfoForYear(year: word;
@@ -543,7 +548,7 @@ end;
     stdDate : TDateTime;
     dayDate : TDateTime;
   begin { TZLocalTimeToUTC }
-    if GetTZDaylightSavingInfoForYear(TZ, Date2Year(loctime), dayDate, stdDate, dayBias, stdBias) then begin
+    if GetTZDaylightSavingInfoForYear(TZ, YearOf(loctime), dayDate, stdDate, dayBias, stdBias) then begin
       if preferDST then
         overBias := dayBias
       else
@@ -590,7 +595,7 @@ end;
     dayDate: TDateTime;
     
   begin { UTCToTZLocalTime }
-    if GetTZDaylightSavingInfoForYear(TZ, Date2Year(utctime), dayDate, stdDate, dayBias, stdBias) then begin
+    if GetTZDaylightSavingInfoForYear(TZ, YearOf(utctime), dayDate, stdDate, dayBias, stdBias) then begin
       dayUTC := dayDate + stdBias/MINUTESPERDAY;
       stdUTC := stdDate + dayBias/MINUTESPERDAY;
       if dayUTC < stdUTC then
@@ -760,6 +765,18 @@ end;
     else
       Result := '\SOFTWARE\Microsoft\Windows\CurrentVersion\Time Zones';
   end; { TimeZoneRegKey }
+
+  function GetLocalTZBias: LongInt;
+  var
+    TZ : TTimeZoneInformation;
+  begin
+    case GetTimeZoneInformation (TZ) of
+      TIME_ZONE_ID_STANDARD: Result := TZ.Bias + TZ.StandardBias;
+      TIME_ZONE_ID_DAYLIGHT: Result := TZ.Bias + TZ.DaylightBias;
+    else
+      Result := TZ.Bias;
+    end;
+  end;
 
 { private }
 
