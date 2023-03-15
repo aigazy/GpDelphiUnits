@@ -102,8 +102,8 @@ unit GpTimezone;
 interface
 
 uses
-  Winapi.Windows,
-  System.Classes;
+  Windows,
+  Classes;
 
 const
   MINUTESPERDAY = 1440;
@@ -166,6 +166,8 @@ type
     function  Count: integer;
     function  Delete(regTimeZone: TGpRegistryTimeZone): boolean;
     function  FindByName(const englishName: string): TGpRegistryTimeZone;
+    function  FindDisplayName(const TimeZone: TTimeZoneInformation): string; 
+    function  FindTimeZone(const DisplayName: string): TTimeZoneInformation;
     procedure Reload;
     property  Items[idx: integer]: TGpRegistryTimeZone read GetItem; default;
     property  WriteAccess: boolean read rtzFullAccess write rtzFullAccess;
@@ -317,8 +319,7 @@ type
   function TimeZoneRegKey: string;
 
   {: Returns the Local TimeZone Bias, in Minutes, taking into account Standard
-	and/or Daylight Biases, from the Regional Settings.
-	@cat SystemOps}
+	and/or Daylight Biases, from the Regional Settings. }
   function GetLocalTZBias: LongInt;
 
 var
@@ -327,9 +328,9 @@ var
 implementation
 
 uses
-  System.SysUtils,
-  System.Win.Registry,
-  System.DateUtils;
+  SysUtils,
+  Registry,
+  DateUtils;
 
 {$UNDEF NeedBetterRegistry}       //There is no OpenKeyReadonly in Delphi 2 and 3.
 {$UNDEF NoResourcestring}         //There is no resourcestring in Delphi 2.
@@ -913,6 +914,28 @@ end;
     end;
   end; { TGpRegistryTimeZones.FindByName }
 
+  function TGpRegistryTimeZones.FindDisplayName(const TimeZone: TTimeZoneInformation): string;
+  var
+    iTZ: integer;
+  begin
+    Result := '';
+    for iTZ := 0 to Count - 1 do begin
+      if IsEqualTZ(Items[iTZ].TimeZone, TimeZone) then
+        Exit(Items[iTZ].DisplayName);
+    end;
+  end; { TGpRegistryTimeZones.FindDisplayName }
+
+  function TGpRegistryTimeZones.FindTimeZone(const DisplayName: string): TTimeZoneInformation;
+  var
+    iTZ: integer;
+  begin
+    Result := Default(TTimeZoneInformation);
+    for iTZ := 0 to Count - 1 do begin
+      if SameText(Items[iTZ].DisplayName, DisplayName) then
+        Exit(Items[iTZ].TimeZone);
+    end;
+  end; { TGpRegistryTimeZones.FindTimeZone }
+
   function TGpRegistryTimeZones.GetItem(idx: integer): TGpRegistryTimeZone;
   begin
     Result := rtzList[idx];
@@ -1029,7 +1052,6 @@ end;
 initialization
   G_RegistryTZ := TGpRegistryTimeZones.Create;
 finalization
-  G_RegistryTZ.Free;
-  G_RegistryTZ := nil;
+  FreeAndNil(G_RegistryTZ);
 end.
 
